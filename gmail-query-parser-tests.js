@@ -36,6 +36,8 @@ Tinytest.add('gmail-query-parser - error reporting', function (test) {
   t("(B)(A", '4: .*close paren');
   t("OR A", '1: .*OR');
   t("B OR", '3: .*OR');
-  t("to: from:", '4: .*operator');
+  t("OR", '1: .*OR');
+  t("to: from:", '1: .*to:');
+  t("to:", '1: .*to:');
 });
 
