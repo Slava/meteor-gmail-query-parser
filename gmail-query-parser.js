@@ -35,13 +35,21 @@ GMailQuery.parse = function (queryString) {
   var stack = [];
   var valStackTopLevel = [ [] ];
   var i = 0;
+  var expectedExpr = null;
 
   var processOp = function (op) {
-    if (op === 'or' || op === 'and') {
+    if (op.type === 'or' || op.type === 'and') {
       var r = valStack.pop();
       var l = valStack.pop();
 
-      if (op === 'or') {
+      if (! r || ! l) {
+        throw generateParseError(
+          queryString,
+          op.start,
+          'missing required arguments for operator: ' + op.token);
+      }
+
+      if (op.type === 'or') {
         if (l.or) {
           l.or = l.or.concat(r);
           return l;
@@ -64,18 +72,25 @@ GMailQuery.parse = function (queryString) {
       }
     } else {
       var r = valStack.pop();
+      if (! r) {
+        throw generateParseError(
+          queryString,
+          op.start,
+          'missing the required argument for operator: ' + op.token);
+      }
+
       var res = {};
-      res[op] = r;
+      res[op.type] = r;
       return res;
     }
   };
 
   var opRank = function (op) {
-    if (op === 'openParen')
+    if (op.type === 'openParen')
       return -1;
-    if (op === 'and')
+    if (op.type === 'and')
       return 1;
-    if (op === 'or')
+    if (op.type === 'or')
       return 2;
     return 3;
   };
@@ -99,51 +114,59 @@ GMailQuery.parse = function (queryString) {
     if (matchedRegexName)
       match = matchedRegex.exec(rest)[1];
 
-      if (matchedRegexName) {
-        if (matchedRegexName === 'closeParen') {
-          while (last(stack) && last(stack) !== 'openParen') {
-            var op = stack.pop();
-            valStack.push(processOp(op));
-          }
-
-          if (! last(stack) || last(stack) !== 'openParen')
-            throw generateParseError(queryString, i, 'no matching open paren');
-
-          // get the open paren out
-          stack.pop();
-          // the current valStack should now have only one element, otherwise
-          // something went wrong
-          if (valStack.length !== 1)
-            throw generateParseError(queryString, i, 'not enough operators in this sub expr');
-
-          var val = last(valStack);
-          valStackTopLevel.pop();
-          valStack = last(valStackTopLevel);
-          if (! valStack)
-            throw generateParseError(queryString, i, 'not enought stacks for exprs?');
-          valStack.push(val);
-
-          canAnd = true;
-        } else if (matchedRegexName === 'openParen') {
-          stack.push('openParen');
-          valStackTopLevel.push([]);
-          valStack = last(valStackTopLevel);
-        } else if (matchedRegexName === 'whitespace') {
-          // no-op
-        } else if (matchedRegexName === 'or') {
-          while (last(stack) && opRank(last(stack)) >= opRank('or')) {
-            var op = stack.pop();
-            valStack.push(processOp(op));
-          }
-          stack.push('or');
-        } else if (matchedRegexName === 'isChat') {
-          stack.push('isChat');
-          canAnd = true;
-        } else if (matchedRegexName) {
-          // some unary operator
-          stack.push(matchedRegexName);
+    if (matchedRegexName) {
+      var operator = { type: matchedRegexName, start: i, token: match };
+      if (matchedRegexName === 'closeParen') {
+        while (last(stack) && last(stack).type !== 'openParen') {
+          var op = stack.pop();
+          valStack.push(processOp(op));
         }
+
+        if (! last(stack) || last(stack).type !== 'openParen')
+          throw generateParseError(queryString, i, 'no matching open paren');
+
+        // get the open paren out
+        stack.pop();
+        // the current valStack should now have only one element, otherwise
+        // something went wrong
+        if (valStack.length !== 1)
+          throw generateParseError(queryString, i, 'not enough operators in this sub expr');
+
+        var val = last(valStack);
+        valStackTopLevel.pop();
+        valStack = last(valStackTopLevel);
+        if (! valStack)
+          throw generateParseError(queryString, i, 'not enought stacks for exprs?');
+        valStack.push(val);
+
+        canAnd = true;
+      } else if (matchedRegexName === 'openParen') {
+        stack.push(operator);
+        valStackTopLevel.push([]);
+        valStack = last(valStackTopLevel);
+      } else if (matchedRegexName === 'whitespace') {
+        // no-op
+        if (expectedExpr)
+          throw generateParseError(
+            queryString,
+          expectedExpr.start,
+          'argument should be followed immediately for operator: ' + expectedExpr.token);
+
+      } else if (matchedRegexName === 'or') {
+        while (last(stack) && opRank(last(stack)) >= opRank(operator)) {
+          var op = stack.pop();
+          valStack.push(processOp(op));
+        }
+        stack.push(operator);
+      } else if (matchedRegexName === 'isChat') {
+        stack.push(operator);
+        canAnd = true;
+      } else if (matchedRegexName) {
+        // some unary operator
+        stack.push(operator);
+        expectedExpr = operator;
       }
+    }
 
     if (! match) {
       var word = null;
@@ -158,19 +181,21 @@ GMailQuery.parse = function (queryString) {
                                  'unexpected token');
       }
 
+      expectedExpr = null;
       valStack.push(word);
       canAnd = true;
     }
 
     if (canAnd) {
       // try to insert 'and' between two rules
-      while (last(stack) && opRank(last(stack)) >= opRank('and')) {
+      var operator = {type: 'and', start: i - 1, token: ''};
+      while (last(stack) && opRank(last(stack)) >= opRank(operator)) {
         var op = stack.pop();
         valStack.push(processOp(op));
       }
       // check if two items on top of the stack are rules
       if (last(valStack) && last(valStack, 1))
-        stack.push('and');
+        stack.push(operator);
     }
 
     i += match.length;
@@ -178,9 +203,9 @@ GMailQuery.parse = function (queryString) {
 
   while (stack.length) {
     var op = stack.pop();
-    if (op === 'openParen')
+    if (op.type === 'openParen')
       throw generateParseError(queryString,
-                               queryString.indexOf('('),
+                               op.start,
                                'no matching close paren');
 
     valStack.push(processOp(op));
