@@ -23,3 +23,19 @@ Tinytest.add('gmail-query-parser - general', function (test) {
   t('((((A OR B) (B OR C))) (C OR D))', [{or:["A", "B"]}, {or:["B", "C"]}, {or:["C", "D"]}], 'parens');
 });
 
+Tinytest.add('gmail-query-parser - error reporting', function (test) {
+  var t = function (q, exp, desc) {
+    test.throws(function () {
+      GMailQuery.parse(q);
+    }, new RegExp(exp), desc);
+  };
+
+  t("A)", '2: .*open paren');
+  t("(A))", '4: .*open paren');
+  t("(A", '1: .*close paren');
+  t("(B)(A", '4: .*close paren');
+  t("OR A", '1: .*OR');
+  t("B OR", '3: .*OR');
+  t("to: from:", '4: .*operator');
+});
+
