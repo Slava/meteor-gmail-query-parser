@@ -34,9 +34,8 @@ GMailQuery.parse = function (queryString) {
 
   var onlyWord = false;
   var stack = [];
-  var valStack = [];
+  var valStackTopLevel = [ [] ];
   var i = 0;
-  var lastWasSepRule = false;
 
   var processOp = function (op) {
     if (op === 'or' || op === 'and') {
@@ -44,12 +43,20 @@ GMailQuery.parse = function (queryString) {
       var l = valStack.pop();
 
       if (op === 'or') {
+        if (l.or) {
+          l.or = l.or.concat(r);
+          return l;
+        }
         if (r.or) {
-          r.or = r.or.concat(l);
+          r.or.unshift(l);
           return r;
         }
         return {or:[l, r]};
       } else {
+        if (_.isArray(l)) {
+          l = l.concat(r);
+          return l;
+        }
         if (_.isArray(r)) {
           r.unshift(l);
           return r;
@@ -77,7 +84,8 @@ GMailQuery.parse = function (queryString) {
   while (i < queryString.length) {
     var rest = queryString.substr(i);
     var match = null;
-    var isSepRule = false;
+    var canAnd = false;
+    var valStack = last(valStackTopLevel);
 
     if (! onlyWord) {
       var matchedRegexName = null;
@@ -94,32 +102,44 @@ GMailQuery.parse = function (queryString) {
         match = matchedRegex.exec(rest)[1];
 
       if (matchedRegexName === 'closeParen') {
-        while (stack.length && stack[stack.length - 1] !== 'openParen') {
+        while (last(stack) && last(stack) !== 'openParen') {
           var op = stack.pop();
           valStack.push(processOp(op));
         }
-        if (! stack.length || stack[stack.length - 1] !== 'openParen')
+
+        if (! last(stack) || last(stack) !== 'openParen')
           throw generateParseError(queryString, i, 'no matching open paren');
+
         // get the open paren out
         stack.pop();
+        // the current valStack should now have only one element, otherwise
+        // something went wrong
+        if (valStack.length !== 1)
+          throw generateParseError(queryString, i, 'not enough operators in this sub expr');
 
-        isSepRule = true;
+        var val = last(valStack);
+        valStackTopLevel.pop();
+        valStack = last(valStackTopLevel);
+        if (! valStack)
+          throw generateParseError(queryString, i, 'not enought stacks for exprs?');
+        valStack.push(val);
+
+        canAnd = true;
       } else if (matchedRegexName === 'openParen') {
-        isSepRule = true;
         stack.push('openParen');
+        valStackTopLevel.push([]);
+        valStack = last(valStackTopLevel);
       } else if (matchedRegexName === 'whitespace') {
-        isSepRule = lastWasSepRule;
-        lastWasSepRule = false;
         // no-op
       } else if (matchedRegexName === 'or') {
-        while (stack.length && opRank(stack[stack.length - 1]) > opRank('or')) {
+        while (last(stack) && opRank(last(stack)) >= opRank('or')) {
           var op = stack.pop();
           valStack.push(processOp(op));
         }
         stack.push('or');
       } else if (matchedRegexName === 'isChat') {
-        isSepRule = true;
         stack.push('isChat');
+        canAnd = true;
       } else if (matchedRegexName) {
         // some unary operator
         stack.push(matchedRegexName);
@@ -140,26 +160,23 @@ GMailQuery.parse = function (queryString) {
                                  onlyWord ? 'expected a word' : null);
       }
 
-      isSepRule = true;
-
       valStack.push(word);
+      canAnd = true;
       onlyWord = false;
     }
 
-    if (lastWasSepRule && isSepRule) {
-      while (stack.length && opRank(stack[stack.length - 1]) > opRank('and')) {
+    if (canAnd) {
+      // try to insert 'and' between two rules
+      while (last(stack) && opRank(last(stack)) >= opRank('and')) {
         var op = stack.pop();
         valStack.push(processOp(op));
       }
-      stack.push('and');
+      // check if two items on top of the stack are rules
+      if (last(valStack) && last(valStack, 1))
+        stack.push('and');
     }
 
-    // hack: don't put "and"s inside of paren expr
-    if (matchedRegexName === 'openParen')
-      isSepRule = false;
-
     i += match.length;
-    lastWasSepRule = isSepRule;
   }
 
   while (stack.length) {
@@ -184,5 +201,10 @@ var generateParseError = function (s, i, reason) {
   return new Error((i+1) + ': Could not parse the query string: '
                    + (reason || 'unexpected token') + '\n'
                    + paddedString + '\n' + paddedAnchor);
+};
+
+var last = function (arr, n) {
+  n = n || 0;
+  return arr.length ? arr[arr.length - 1 - n] : null;
 };
 
