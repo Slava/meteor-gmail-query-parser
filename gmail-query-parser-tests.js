@@ -10,7 +10,7 @@ Tinytest.add('gmail-query-parser - general', function (test) {
   t('from:slava OR from:peter bla', [{or:[{from:"slava"}, {from:"peter"}]}, "bla"]);
   t('from:slava OR from:peter OR bla', {or:[{from:"slava"}, {from:"peter"}, "bla"]});
   t('from:amy (dinner OR movie)', [{from:"amy"}, {or: ["dinner", "movie"]}]);
-  t('subject:(dinner movie)', [{subject:["dinner", "movie"]}]);
+  t('subject:(dinner movie)', {subject:["dinner", "movie"]});
   t('subject:(dinner movie OR stuff)', {subject:["dinner", {or:["movie", "stuff"]}]});
   t('subject:(dinner OR movie stuff)', {subject:[{or:["movie", "dinner"]}, "stuff"]});
   t('dinner movie OR girls houses', ["dinner", {or:["movie", "girls"]}, "houses"]);
