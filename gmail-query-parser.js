@@ -1,5 +1,5 @@
-// XXX: check global?
-GMailQuery = {};
+if (typeof GMailQuery === 'undefined')
+  GMailQuery = {};
 
 var lexemRegexStrings = {
   openParen: '\\(',
