@@ -16,5 +16,10 @@ Tinytest.add('gmail-query-parser - general', function (test) {
   t('dinner movie OR girls houses', ["dinner", {or:["movie", "girls"]}, "houses"]);
   t('things OR "not things" OR projects OR "pension"', {or: ["things", "not things", "projects", "pension"]});
   t('(things OR "not things" OR projects OR "pension") OR from:me', {or: ["things", "not things", "projects", "pension", {from: "me"}]});
+  t('d  (from:hey  ney) f', ["d", {from:"hey"}, "ney", "f"], 'flatten AND rules');
+  t('from:A OR B C', [{or:[{from:"A"}, "B"]}, "C"], 'tricky OR/AND parsing');
+  t('from:A B', [{from:"A"}, "B"], 'tricky AND parsing');
+  t('((((A OR B))))', {or:["A", "B"]}, 'parens');
+  t('((((A OR B) (B OR C))) (C OR D))', [{or:["A", "B"]}, {or:["B", "C"]}, {or:["C", "D"]}], 'parens');
 });
 
