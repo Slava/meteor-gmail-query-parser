@@ -1,7 +1,8 @@
 Package.describe({
-  summary: " \* Fill me in! *\ ",
+  name: "slava:gmail-query-parser",
+  summary: "Parses GMail queries.",
   version: "1.0.0",
-  git: " \* Fill me in! *\ "
+  git: "https://github.com/Slava/meteor-gmail-query-parser"
 });
 
 Package.onUse(function(api) {
@@ -13,6 +14,6 @@ Package.onUse(function(api) {
 
 Package.onTest(function(api) {
   api.use('tinytest');
-  api.use('gmail-query-parser');
+  api.use('slava:gmail-query-parser');
   api.addFiles('gmail-query-parser-tests.js');
 });
