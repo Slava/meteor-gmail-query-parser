@@ -32,7 +32,6 @@ var prepareRegexs = _.once(function () {
 GMailQuery.parse = function (queryString) {
   prepareRegexs();
 
-  var onlyWord = false;
   var stack = [];
   var valStackTopLevel = [ [] ];
   var i = 0;
@@ -87,65 +86,64 @@ GMailQuery.parse = function (queryString) {
     var canAnd = false;
     var valStack = last(valStackTopLevel);
 
-    if (! onlyWord) {
-      var matchedRegexName = null;
-      // find the first regex that matches the prefix
-      var matchedRegex = _.find(lexemRegexs, function (regex, name) {
-        if (regex.test(rest)) {
-          matchedRegexName = name;
-          return true;
-        }
-      });
-
-      // if found a match, split it, otherwise continue
-      if (matchedRegexName)
-        match = matchedRegex.exec(rest)[1];
-
-      if (matchedRegexName === 'closeParen') {
-        while (last(stack) && last(stack) !== 'openParen') {
-          var op = stack.pop();
-          valStack.push(processOp(op));
-        }
-
-        if (! last(stack) || last(stack) !== 'openParen')
-          throw generateParseError(queryString, i, 'no matching open paren');
-
-        // get the open paren out
-        stack.pop();
-        // the current valStack should now have only one element, otherwise
-        // something went wrong
-        if (valStack.length !== 1)
-          throw generateParseError(queryString, i, 'not enough operators in this sub expr');
-
-        var val = last(valStack);
-        valStackTopLevel.pop();
-        valStack = last(valStackTopLevel);
-        if (! valStack)
-          throw generateParseError(queryString, i, 'not enought stacks for exprs?');
-        valStack.push(val);
-
-        canAnd = true;
-      } else if (matchedRegexName === 'openParen') {
-        stack.push('openParen');
-        valStackTopLevel.push([]);
-        valStack = last(valStackTopLevel);
-      } else if (matchedRegexName === 'whitespace') {
-        // no-op
-      } else if (matchedRegexName === 'or') {
-        while (last(stack) && opRank(last(stack)) >= opRank('or')) {
-          var op = stack.pop();
-          valStack.push(processOp(op));
-        }
-        stack.push('or');
-      } else if (matchedRegexName === 'isChat') {
-        stack.push('isChat');
-        canAnd = true;
-      } else if (matchedRegexName) {
-        // some unary operator
-        stack.push(matchedRegexName);
-        onlyWord = true;
+    var matchedRegexName = null;
+    // find the first regex that matches the prefix
+    var matchedRegex = _.find(lexemRegexs, function (regex, name) {
+      if (regex.test(rest)) {
+        matchedRegexName = name;
+        return true;
       }
-    }
+    });
+
+    // if found a match, split it, otherwise continue
+    if (matchedRegexName)
+      match = matchedRegex.exec(rest)[1];
+
+      if (matchedRegexName) {
+        if (matchedRegexName === 'closeParen') {
+          while (last(stack) && last(stack) !== 'openParen') {
+            var op = stack.pop();
+            valStack.push(processOp(op));
+          }
+
+          if (! last(stack) || last(stack) !== 'openParen')
+            throw generateParseError(queryString, i, 'no matching open paren');
+
+          // get the open paren out
+          stack.pop();
+          // the current valStack should now have only one element, otherwise
+          // something went wrong
+          if (valStack.length !== 1)
+            throw generateParseError(queryString, i, 'not enough operators in this sub expr');
+
+          var val = last(valStack);
+          valStackTopLevel.pop();
+          valStack = last(valStackTopLevel);
+          if (! valStack)
+            throw generateParseError(queryString, i, 'not enought stacks for exprs?');
+          valStack.push(val);
+
+          canAnd = true;
+        } else if (matchedRegexName === 'openParen') {
+          stack.push('openParen');
+          valStackTopLevel.push([]);
+          valStack = last(valStackTopLevel);
+        } else if (matchedRegexName === 'whitespace') {
+          // no-op
+        } else if (matchedRegexName === 'or') {
+          while (last(stack) && opRank(last(stack)) >= opRank('or')) {
+            var op = stack.pop();
+            valStack.push(processOp(op));
+          }
+          stack.push('or');
+        } else if (matchedRegexName === 'isChat') {
+          stack.push('isChat');
+          canAnd = true;
+        } else if (matchedRegexName) {
+          // some unary operator
+          stack.push(matchedRegexName);
+        }
+      }
 
     if (! match) {
       var word = null;
@@ -157,12 +155,11 @@ GMailQuery.parse = function (queryString) {
       } else {
         throw generateParseError(queryString,
                                  i,
-                                 onlyWord ? 'expected a word' : null);
+                                 'unexpected token');
       }
 
       valStack.push(word);
       canAnd = true;
-      onlyWord = false;
     }
 
     if (canAnd) {
