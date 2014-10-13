@@ -1,7 +1,7 @@
 Package.describe({
   name: "slava:gmail-query-parser",
   summary: "Parses GMail queries.",
-  version: "1.0.0",
+  version: "1.1.0",
   git: "https://github.com/Slava/meteor-gmail-query-parser"
 });
 

@@ -8,8 +8,8 @@ GMail has its own little [query
 syntax](https://support.google.com/mail/answer/7190?hl=en) that was designed to
 be an easy way for power users to filter their GMail inbox.
 
-This package provides one method to the `GMailQuery` exported symbol:
-`GMailQuery.parse`.
+This package provides one method `GMailQuery.parse` and one class
+`GMailQuery.Matcher`.
 
 By feeding the query string such as `'from:me to:(bob@example.com OR
 bob@corp.com)' -kittens "Serious Business"` to find all the emails sent to Bob
@@ -22,6 +22,9 @@ parsed object that looks something like this:
 
 Later this structured form of query can be used by other software to filter out
 messages those came from the GMail API.
+
+Or you can use the `GMailQuery.Matcher` class that provides the `matches`
+method for this exact reason.
 
 Supported syntax:
 ---
