@@ -21,7 +21,7 @@ var lexemRegexStrings = {
 };
 var lexemRegexs = {};
 var quotedWordRegex = /^("[^"]*")/;
-var wordRegex = /(^\w+)/;
+var wordRegex = /^([^\s()]+)/;
 
 var prepareRegexs = _.once(function () {
   _.each(lexemRegexStrings, function (str, name) {
